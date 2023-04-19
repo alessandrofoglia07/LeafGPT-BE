@@ -4,8 +4,8 @@ const MessageSchema = new Schema({
         type: Number,
         required: true,
     },
-    room: {
-        type: String,
+    chatID: {
+        type: Number,
         required: true,
     },
     author: {

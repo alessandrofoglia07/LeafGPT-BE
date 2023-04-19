@@ -1,8 +1,13 @@
 import User from './models/users.js';
+import mongoose from 'mongoose';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 // runs every hour
 setInterval(async () => {
     try {
+        await mongoose.connect(process.env.ATLAS_URI as string);
         console.log('\x1b[33m', 'Checking for expired users...');
         const expiredUsers = await User.find({ verified: false, expiresAt: { $lte: Date.now() } });
         if (expiredUsers.length > 0) {
@@ -15,5 +20,7 @@ setInterval(async () => {
         }
     } catch (err) {
         console.log(err);
+    } finally {
+        await mongoose.connection.close();
     }
 }, 60 * 60 * 1000);

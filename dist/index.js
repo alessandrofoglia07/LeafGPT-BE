@@ -70,16 +70,16 @@ const verifyEmail = async (verificationToken) => {
     try {
         const user = await User.findOne({ verificationToken });
         if (!user) {
-            return 'Invalid token';
+            return 'Your token is invalid. Please register again';
         }
         if (user.verified) {
-            return 'Email already verified';
+            return 'Your email is already verified. Go to login';
         }
         if (user.expiresAt && user.expiresAt < Date.now()) {
-            return 'Token expired';
+            return 'Your token is expired. Please register again';
         }
         await User.updateOne({ verificationToken }, { verified: true });
-        return 'Email verified';
+        return 'Your email has been verified. Welcome to ForestAI!';
     }
     catch (err) {
         console.log(err);
