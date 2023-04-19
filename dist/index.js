@@ -24,8 +24,8 @@ const transporter = nodemailer.createTransport({
 const connectToDB = async () => {
     try {
         await mongoose.connect(URI);
-        console.log('Connected to MongoDB');
-        app.listen(PORT, () => console.log(`Server is running on port: ${PORT}`));
+        console.log('\x1b[36m', '-- Connected to MongoDB');
+        app.listen(PORT, () => console.log('\x1b[36m', `-- Server is running on port: ${PORT}`));
     }
     catch (err) {
         console.log(err);
@@ -74,6 +74,9 @@ const verifyEmail = async (verificationToken) => {
         }
         if (user.verified) {
             return 'Email already verified';
+        }
+        if (user.expiresAt && user.expiresAt < Date.now()) {
+            return 'Token expired';
         }
         await User.updateOne({ verificationToken }, { verified: true });
         return 'Email verified';

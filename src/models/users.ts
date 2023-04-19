@@ -5,6 +5,7 @@ interface IUser {
     password: string;
     verified: boolean;
     verificationToken?: string;
+    expiresAt?: number;
 }
 
 interface IUserModel extends IUser, Document { }
@@ -25,6 +26,10 @@ const UserSchema = new Schema({
     },
     verificationToken: {
         type: String,
+    },
+    expiresAt: {
+        type: Number,
+        default: Date.now() + 24 * 60 * 60 * 1000,
     },
 }, { timestamps: true });
 

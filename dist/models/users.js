@@ -16,6 +16,10 @@ const UserSchema = new Schema({
     verificationToken: {
         type: String,
     },
+    expiresAt: {
+        type: Number,
+        default: Date.now() + 24 * 60 * 60 * 1000,
+    },
 }, { timestamps: true });
 const User = model('User', UserSchema);
 export default User;
