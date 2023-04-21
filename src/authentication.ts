@@ -18,6 +18,7 @@ const authenticateJWT = (req: AuthenticatedRequest, res: Response, next: NextFun
     jwt.verify(token, process.env.JWT_SECRET as string, (err, user) => {
         if (err) {
             res.sendStatus(403);
+            console.log('Authentication error: ' + err);
             return;
         }
 

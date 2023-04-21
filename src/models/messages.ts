@@ -1,28 +1,23 @@
 import { Schema, model, Document } from 'mongoose';
 
 interface IMessage {
-    userID: number;
-    chatID: number;
-    author: string;
-    message: string;
+    chatID: string;
+    author: 'user' | 'bot';
+    content: string;
 }
 
 interface IMessageModel extends IMessage, Document { }
 
 const MessageSchema = new Schema({
-    userID: {
-        type: Number,
-        required: true,
-    },
     chatID: {
-        type: Number,
+        type: String,
         required: true,
     },
     author: {
         type: String,
         required: true,
     },
-    message: {
+    content: {
         type: String,
         required: true,
     },

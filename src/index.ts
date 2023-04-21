@@ -3,12 +3,14 @@ import cors from 'cors';
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import User from './models/users.js';
+import Conversation from './models/conversations.js';
 import Message from './models/messages.js';
 import nodemailer from 'nodemailer';
 import { v4 as uuidv4 } from 'uuid';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import authenticateJWT, { AuthenticatedRequest } from './authentication.js';
+import { Configuration, OpenAIApi } from "openai";
 
 dotenv.config();
 
@@ -20,6 +22,11 @@ app.use(express.json());
 const URI = process.env.ATLAS_URI as string;
 const PORT = process.env.PORT || 5000;
 const SALT_ROUNDS = 10;
+const openaiConfig = new Configuration({
+    apiKey: process.env.OPENAI_API_KEY,
+});
+
+const openai = new OpenAIApi(openaiConfig);
 
 const transporter = nodemailer.createTransport({
     service: 'gmail',
@@ -52,6 +59,19 @@ const sendEmail = async (to: string, subject: string, text: string) => {
         console.log('Email sent ' + info.response);
     } catch (err) {
         console.log(err);
+    }
+};
+
+const createCompletion = async (messages: { role: 'user' | 'assistant', content: string; }[]) => {
+    try {
+        const completion = await openai.createChatCompletion({
+            model: 'gpt-3.5-turbo',
+            messages: messages,
+        });
+        return completion.data.choices[0].message?.content;
+    } catch (err) {
+        console.log(err);
+        return;
     }
 };
 
@@ -124,5 +144,77 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
     } catch (err) {
         console.log(err);
         res.send({ message: 'Server error' });
+    }
+});
+
+// get all conversations for a user
+app.get('/api/chat/getChats', authenticateJWT, async (req: AuthenticatedRequest, res: Response) => {
+    const { id } = req.user;
+
+    try {
+        const conversations: any[] = await Conversation.find({ userID: id });
+        res.status(200).send(conversations);
+    } catch (err) {
+        console.log(err);
+    }
+});
+
+// get a conversation by id
+app.get('api/chat/getMessagesByChatID/:chatId', authenticateJWT, async (req: AuthenticatedRequest, res: Response) => {
+    const { chatId } = req.params;
+
+    try {
+        const messages: any[] = await Message.find({ conversationID: chatId }).sort({ createdAt: -1 });
+        res.status(200).send(messages);
+    } catch (err) {
+        console.log(err);
+    }
+});
+
+// create a new message
+app.post('/api/chat/createMessage', authenticateJWT, async (req: AuthenticatedRequest, res: Response) => {
+    let { chatID }: { chatID: string; } = req.body;
+    const { message }: { message: { author: 'user' | 'assistant', content: string; }; } = req.body;
+    const { id } = req.user;
+
+    try {
+        // if chatID is empty, create a new conversation
+        // TODO solve bug
+        if (!chatID) {
+            console.log('\x1b[33m', 1);
+            const title = await createCompletion([{ role: 'user', content: `Create a conversation title for this question. It must have no more than 30 characters. The question: "${message.content}"` }]);
+            const newConversation = new Conversation({ userID: id, title: title });
+            await newConversation.save();
+            chatID = newConversation._id;
+            console.log('\x1b[33m', 2);
+        };
+
+        const newMessage = new Message({ chatID: chatID, author: message.author, content: message.content });
+        await newMessage.save();
+        console.log('\x1b[33m', 3);
+
+        // get every message in the conversation
+        const dbMessages: any[] = await Message.find({ conversationID: chatID }).sort({ createdAt: -1 });
+        const messages: any[] = dbMessages.map((message) => {
+            return { role: message.author, content: message.content };
+        });
+        console.log('\x1b[33m', 4);
+
+        // get chatgpt response
+        const completion = await createCompletion(messages);
+        const chatgptResponse = { role: 'assistant', content: completion };
+        console.log('\x1b[33m', 5);
+
+        // save chatgpt response to db
+        const newChatgptMessage = new Message({ chatID: chatID, author: chatgptResponse.role, content: chatgptResponse.content });
+        await newChatgptMessage.save();
+        console.log('\x1b[33m', 6);
+
+        // send chatgpt response to client
+        res.status(200).send(chatgptResponse);
+        console.log('\x1b[33m', 7);
+
+    } catch (err) {
+        console.log(err);
     }
 });

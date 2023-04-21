@@ -4,7 +4,7 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-// runs every hour
+// runs every half hour
 setInterval(async () => {
     try {
         await mongoose.connect(process.env.ATLAS_URI as string);
@@ -23,4 +23,4 @@ setInterval(async () => {
     } finally {
         await mongoose.connection.close();
     }
-}, 60 * 60 * 1000);
+}, 30 * 60 * 1000);

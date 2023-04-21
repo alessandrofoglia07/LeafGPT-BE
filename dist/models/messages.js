@@ -1,18 +1,14 @@
 import { Schema, model } from 'mongoose';
 const MessageSchema = new Schema({
-    userID: {
-        type: Number,
-        required: true,
-    },
     chatID: {
-        type: Number,
+        type: String,
         required: true,
     },
     author: {
         type: String,
         required: true,
     },
-    message: {
+    content: {
         type: String,
         required: true,
     },
