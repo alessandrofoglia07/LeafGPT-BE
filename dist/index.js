@@ -55,19 +55,6 @@ const sendEmail = async (to, subject, text) => {
         console.log(err);
     }
 };
-const createCompletion = async (messages) => {
-    try {
-        const completion = await openai.createChatCompletion({
-            model: 'gpt-3.5-turbo',
-            messages: messages,
-        });
-        return completion.data.choices[0].message?.content;
-    }
-    catch (err) {
-        console.log(err);
-        return;
-    }
-};
 app.post('/api/auth/sendVerificationEmail', async (req, res) => {
     const { email, password } = req.body;
     const verificationToken = uuidv4();
@@ -159,6 +146,21 @@ app.get('api/chat/getMessagesByChatID/:chatId', authenticateJWT, async (req, res
         console.log(err);
     }
 });
+const createCompletion = async (messages) => {
+    try {
+        const completion = await openai.createChatCompletion({
+            model: 'gpt-3.5-turbo',
+            messages: messages,
+        });
+        console.log('Hey ' + completion.data.choices[0].message?.content);
+        console.log(messages);
+        return completion.data.choices[0].message?.content;
+    }
+    catch (err) {
+        console.log(err);
+        return;
+    }
+};
 // create a new message
 app.post('/api/chat/createMessage', authenticateJWT, async (req, res) => {
     let { chatID } = req.body;
@@ -186,7 +188,7 @@ app.post('/api/chat/createMessage', authenticateJWT, async (req, res) => {
         });
         console.log('\x1b[33m', 4);
         // get chatgpt response
-        const completion = await createCompletion(messages);
+        const completion = await createCompletion([...messages, { role: 'user', content: message.content }]);
         const chatgptResponse = { role: 'assistant', content: completion };
         console.log('\x1b[33m', 5);
         // save chatgpt response to db
@@ -196,6 +198,34 @@ app.post('/api/chat/createMessage', authenticateJWT, async (req, res) => {
         // send chatgpt response to client
         res.status(200).send(chatgptResponse);
         console.log('\x1b[33m', 7);
+    }
+    catch (err) {
+        console.log(err);
+    }
+});
+app.delete('/api/admin/deleteMessages', async (req, res) => {
+    const { password } = req.body;
+    try {
+        if (password !== process.env.ADMIN_PASSWORD) {
+            res.send({ message: 'Incorrect password' });
+            return;
+        }
+        await Message.deleteMany({});
+        res.status(200).send({ message: 'Messages deleted' });
+    }
+    catch (err) {
+        console.log(err);
+    }
+});
+app.delete('/api/admin/deleteChats', async (req, res) => {
+    const { password } = req.body;
+    try {
+        if (password !== process.env.ADMIN_PASSWORD) {
+            res.send({ message: 'Incorrect password' });
+            return;
+        }
+        await Conversation.deleteMany({});
+        res.status(200).send({ message: 'Chats deleted' });
     }
     catch (err) {
         console.log(err);

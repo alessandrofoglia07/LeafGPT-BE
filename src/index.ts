@@ -62,19 +62,6 @@ const sendEmail = async (to: string, subject: string, text: string) => {
     }
 };
 
-const createCompletion = async (messages: { role: 'user' | 'assistant', content: string; }[]) => {
-    try {
-        const completion = await openai.createChatCompletion({
-            model: 'gpt-3.5-turbo',
-            messages: messages,
-        });
-        return completion.data.choices[0].message?.content;
-    } catch (err) {
-        console.log(err);
-        return;
-    }
-};
-
 app.post('/api/auth/sendVerificationEmail', async (req: Request, res: Response) => {
     const { email, password }: { email: string, password: string; } = req.body;
     const verificationToken = uuidv4();
@@ -171,6 +158,21 @@ app.get('api/chat/getMessagesByChatID/:chatId', authenticateJWT, async (req: Aut
     }
 });
 
+const createCompletion = async (messages: { role: 'user' | 'assistant', content: string; }[]) => {
+    try {
+        const completion = await openai.createChatCompletion({
+            model: 'gpt-3.5-turbo',
+            messages: messages,
+        });
+        console.log('Hey ' + completion.data.choices[0].message?.content);
+        console.log(messages);
+        return completion.data.choices[0].message?.content;
+    } catch (err) {
+        console.log(err);
+        return;
+    }
+};
+
 // create a new message
 app.post('/api/chat/createMessage', authenticateJWT, async (req: AuthenticatedRequest, res: Response) => {
     let { chatID }: { chatID: string; } = req.body;
@@ -200,8 +202,10 @@ app.post('/api/chat/createMessage', authenticateJWT, async (req: AuthenticatedRe
         });
         console.log('\x1b[33m', 4);
 
+
+
         // get chatgpt response
-        const completion = await createCompletion(messages);
+        const completion = await createCompletion([...messages, { role: 'user', content: message.content }]);
         const chatgptResponse = { role: 'assistant', content: completion };
         console.log('\x1b[33m', 5);
 
@@ -214,6 +218,36 @@ app.post('/api/chat/createMessage', authenticateJWT, async (req: AuthenticatedRe
         res.status(200).send(chatgptResponse);
         console.log('\x1b[33m', 7);
 
+    } catch (err) {
+        console.log(err);
+    }
+});
+
+app.delete('/api/admin/deleteMessages', async (req: Request, res: Response) => {
+    const { password } = req.body;
+
+    try {
+        if (password !== process.env.ADMIN_PASSWORD) {
+            res.send({ message: 'Incorrect password' });
+            return;
+        }
+        await Message.deleteMany({});
+        res.status(200).send({ message: 'Messages deleted' });
+    } catch (err) {
+        console.log(err);
+    }
+});
+
+app.delete('/api/admin/deleteChats', async (req: Request, res: Response) => {
+    const { password } = req.body;
+
+    try {
+        if (password !== process.env.ADMIN_PASSWORD) {
+            res.send({ message: 'Incorrect password' });
+            return;
+        }
+        await Conversation.deleteMany({});
+        res.status(200).send({ message: 'Chats deleted' });
     } catch (err) {
         console.log(err);
     }
