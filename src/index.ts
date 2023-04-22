@@ -180,18 +180,6 @@ const createCompletion = async (messages: { role: 'user' | 'assistant', content:
     }
 };
 
-io.on('connection', (socket) => {
-    console.log('a user connected');
-
-    socket.on('newMessage', (data) => {
-        console.log(data);
-    });
-
-    socket.on('disconnect', () => {
-        console.log('user disconnected');
-    });
-});
-
 // create a new message
 app.post('/api/chat/createMessage', authenticateJWT, async (req: AuthenticatedRequest, res: Response) => {
     let { chatID }: { chatID: string; } = req.body;
@@ -201,10 +189,11 @@ app.post('/api/chat/createMessage', authenticateJWT, async (req: AuthenticatedRe
     try {
         // if chatID is empty, create a new conversation
         if (!chatID) {
-            const title = await createCompletion([{ role: 'user', content: `Create a conversation title for this question. It must have no more than 30 characters. The question: "${message.content}"` }]);
+            const title = await createCompletion([{ role: 'user', content: `Create a conversation title for this question. It must have no more than 30 characters. The question: ${message.content}` }]);
             const newConversation = new Conversation({ userID: id, title: title });
             await newConversation.save();
             chatID = newConversation._id;
+            io.emit('newChat', { chatID: chatID });
         };
 
         // save message to db
@@ -213,7 +202,7 @@ app.post('/api/chat/createMessage', authenticateJWT, async (req: AuthenticatedRe
         io.emit('newMessage', { chatID: chatID });
 
         // get every message in the conversation
-        const dbMessages: any[] = await Message.find({ conversationID: chatID }).sort({ createdAt: -1 });
+        const dbMessages: any[] = await Message.find({ chatID: chatID }).sort({ createdAt: -1 });
         const messages: any[] = dbMessages.map((message) => {
             return { role: message.author, content: message.content };
         });
@@ -234,6 +223,20 @@ app.post('/api/chat/createMessage', authenticateJWT, async (req: AuthenticatedRe
         // send chatgpt response to client
         res.status(200).send({ message: 'Res sent', GPTResponse: chatgptResponse, chatID: chatID, chatTitle: chatTitle });
 
+    } catch (err) {
+        console.log(err);
+    }
+});
+
+app.delete('/api/chat/deleteAllChatsByUserID', authenticateJWT, async (req: AuthenticatedRequest, res: Response) => {
+    const { id } = req.user;
+
+    try {
+        const conversations: any[] = await Conversation.find({ userID: id });
+        const chatIDs = conversations.map((conversation) => conversation._id);
+        await Conversation.deleteMany({ userID: id });
+        await Message.deleteMany({ chatID: { $in: chatIDs } });
+        res.status(200).send({ message: 'Chats deleted' });
     } catch (err) {
         console.log(err);
     }
