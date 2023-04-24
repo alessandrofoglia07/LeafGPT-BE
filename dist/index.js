@@ -155,11 +155,12 @@ app.get('/api/chat/getMessagesByChatID/:id', authenticateJWT, async (req, res) =
         console.log(err);
     }
 });
+const systemMessage = { role: 'system', content: 'Your name is LeafGPT. You are a helpful and friendly chatbot and your goal is to answer the question you are asked. You have been developed by Alexxino. You are supported with the GPT-3.5-turbo model by OpenAI. You love leaves and plants, and you often like to find correlation between the thing you are saying and leaves.' };
 const createCompletion = async (messages) => {
     try {
         const completion = await openai.createChatCompletion({
             model: 'gpt-3.5-turbo',
-            messages: messages,
+            messages: [systemMessage, ...messages],
         });
         return completion.data.choices[0].message?.content;
     }
