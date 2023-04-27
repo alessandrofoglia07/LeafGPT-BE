@@ -149,13 +149,14 @@ app.get('/api/chat/getMessagesByChatID/:id', authenticateJWT, async (req, res) =
     const id = req.params.id;
     try {
         const messages = await Message.find({ chatID: id }).sort({ createdAt: -1 });
+        io.emit('updatedChats');
         res.status(200).send(messages);
     }
     catch (err) {
         console.log(err);
     }
 });
-const systemMessage = { role: 'system', content: 'Your name is LeafGPT. You are a helpful and friendly chatbot and your goal is to answer the question you are asked. You have been developed by Alexxino. You are supported with the GPT-3.5-turbo model by OpenAI. You love leaves and plants, and you often like to find correlation between the thing you are saying and leaves.' };
+const systemMessage = { role: 'system', content: 'Your name is LeafGPT. You are a helpful and friendly chatbot and your goal is to answer the question you are asked. You have been developed by Alexxino. You are supported with the GPT-3.5-turbo model by OpenAI. You love leaves and plants, and you often like to find correlation between the thing you are saying and leaves (do not say that explicitly to the user).' };
 const createCompletion = async (messages) => {
     try {
         const completion = await openai.createChatCompletion({
@@ -204,6 +205,7 @@ app.post('/api/chat/createMessage', authenticateJWT, async (req, res) => {
         const chat = await Conversation.findOne({ _id: chatID });
         const chatTitle = chat?.title;
         // send chatgpt response to client
+        io.emit('updatedChats');
         res.status(200).send({ message: 'Res sent', GPTResponse: chatgptResponse, chatID: chatID, chatTitle: chatTitle });
     }
     catch (err) {
@@ -217,6 +219,7 @@ app.delete('/api/chat/deleteAllChatsByUserID', authenticateJWT, async (req, res)
         const chatIDs = conversations.map((conversation) => conversation._id);
         await Conversation.deleteMany({ userID: id });
         await Message.deleteMany({ chatID: { $in: chatIDs } });
+        io.emit('updatedChats');
         res.status(200).send({ message: 'Chats deleted' });
     }
     catch (err) {
@@ -245,6 +248,7 @@ app.delete('/api/admin/deleteChats', async (req, res) => {
             return;
         }
         await Conversation.deleteMany({});
+        io.emit('updatedChats');
         res.status(200).send({ message: 'Chats deleted' });
     }
     catch (err) {

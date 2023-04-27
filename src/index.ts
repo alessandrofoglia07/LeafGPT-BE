@@ -161,6 +161,7 @@ app.get('/api/chat/getMessagesByChatID/:id', authenticateJWT, async (req: Authen
 
     try {
         const messages: any[] = await Message.find({ chatID: id }).sort({ createdAt: -1 });
+        io.emit('updatedChats');
         res.status(200).send(messages);
     } catch (err) {
         console.log(err);
@@ -223,6 +224,7 @@ app.post('/api/chat/createMessage', authenticateJWT, async (req: AuthenticatedRe
         const chatTitle = chat?.title;
 
         // send chatgpt response to client
+        io.emit('updatedChats');
         res.status(200).send({ message: 'Res sent', GPTResponse: chatgptResponse, chatID: chatID, chatTitle: chatTitle });
 
     } catch (err) {
@@ -238,6 +240,7 @@ app.delete('/api/chat/deleteAllChatsByUserID', authenticateJWT, async (req: Auth
         const chatIDs = conversations.map((conversation) => conversation._id);
         await Conversation.deleteMany({ userID: id });
         await Message.deleteMany({ chatID: { $in: chatIDs } });
+        io.emit('updatedChats');
         res.status(200).send({ message: 'Chats deleted' });
     } catch (err) {
         console.log(err);
@@ -268,6 +271,7 @@ app.delete('/api/admin/deleteChats', async (req: Request, res: Response) => {
             return;
         }
         await Conversation.deleteMany({});
+        io.emit('updatedChats');
         res.status(200).send({ message: 'Chats deleted' });
     } catch (err) {
         console.log(err);
