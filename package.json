@@ -20,6 +20,7 @@
         "@types/mongoose": "^5.11.97",
         "@types/nodemailer": "^6.4.7",
         "@types/socket.io": "^3.0.2",
+        "axios": "^1.4.0",
         "bcrypt": "^5.1.0",
         "concurrently": "^8.0.1",
         "cors": "^2.8.5",
