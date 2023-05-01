@@ -2,7 +2,7 @@ import { Schema, model, Document } from 'mongoose';
 
 interface IMessage {
     chatID: string;
-    author: 'user' | 'bot';
+    role: 'user' | 'bot';
     content: string;
 }
 
@@ -13,7 +13,7 @@ const MessageSchema = new Schema({
         type: String,
         required: true,
     },
-    author: {
+    role: {
         type: String,
         required: true,
     },

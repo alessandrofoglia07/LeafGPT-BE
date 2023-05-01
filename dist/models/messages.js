@@ -4,7 +4,7 @@ const MessageSchema = new Schema({
         type: String,
         required: true,
     },
-    author: {
+    role: {
         type: String,
         required: true,
     },

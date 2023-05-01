@@ -175,7 +175,10 @@ app.get('/api/chat/getChatTitleByID/:id', authenticateJWT, async (req: Authentic
     try {
         const chat = await Conversation.findById(id);
         res.status(200).send(chat?.title);
-    } catch (err) {
+    } catch (err: any) {
+        if (JSON.stringify(err).includes('Cast to ObjectId failed')) {
+            res.send('Chat not found');
+        }
         console.log(err);
     }
 });
@@ -198,7 +201,7 @@ const createCompletion = async (messages: { role: 'user' | 'assistant', content:
 // create a new message
 app.post('/api/chat/createMessage', authenticateJWT, async (req: AuthenticatedRequest, res: Response) => {
     let { chatID }: { chatID: string; } = req.body;
-    const { message }: { message: { author: 'user' | 'assistant', content: string; }; } = req.body;
+    const { message }: { message: { role: 'user' | 'assistant', content: string; }; } = req.body;
     const { id } = req.user;
 
     try {
@@ -212,32 +215,62 @@ app.post('/api/chat/createMessage', authenticateJWT, async (req: AuthenticatedRe
         };
 
         // save message to db
-        const newMessage = new Message({ chatID: chatID, author: message.author, content: message.content });
+        const newMessage = new Message({ chatID: chatID, role: message.role, content: message.content });
         await newMessage.save();
         io.emit('newMessage', { chatID: chatID });
 
         // get every message in the conversation
-        const dbMessages: any[] = await Message.find({ chatID: chatID }).sort({ createdAt: -1 });
+        const dbMessages: any[] = await Message.find({ chatID: chatID }).sort({ createdAt: 1 });
         const messages: any[] = dbMessages.map((message) => {
-            return { role: message.author, content: message.content };
+            return { role: message.role, content: message.content };
         });
 
         // get chatgpt response
-        const completion = await createCompletion([...messages, { role: 'user', content: message.content }]);
-        const chatgptResponse = { role: 'assistant', content: completion };
+        const completion = await openai.createChatCompletion({
+            model: 'gpt-3.5-turbo',
+            messages: [systemMessage, ...messages, { role: 'user', content: message.content }],
+            stream: true
+        }, { responseType: 'stream' });
+        io.emit('chatgptResChunk', { chatID: chatID, content: '.' });
+        const stream = completion.data as unknown as IncomingMessage;
+        let chatgptResponse: { role: 'assistant', content: string; } = { role: 'assistant', content: '' };
+        stream.on('data', (chunk: Buffer) => {
+            const payloads = chunk.toString().split("\n\n");
+            for (const payload of payloads) {
+                if (payload.includes('[DONE]')) return;
+                if (payload.startsWith("data:")) {
+                    const data = JSON.parse(payload.replace("data: ", ""));
+                    try {
+                        const chunk: undefined | string = data.choices[0].delta?.content;
+                        if (chunk) {
+                            chatgptResponse.content += chunk;
+                            io.emit('chatgptResChunk', { chatID: chatID, content: chatgptResponse.content });
+                        }
+                    } catch (err) {
+                        console.log(`Error with JSON.parse and ${payload}.\n${err}`);
+                    }
+                }
+            }
+        });
 
-        // save chatgpt response to db
-        const newChatgptMessage = new Message({ chatID: chatID, author: chatgptResponse.role, content: chatgptResponse.content });
-        await newChatgptMessage.save();
-        io.emit('newMessage', { chatID: chatID });
+        stream.on('end', async () => {
+            // save chatgpt response to db
+            const newChatgptMessage = new Message({ chatID: chatID, role: chatgptResponse.role, content: chatgptResponse.content });
+            await newChatgptMessage.save();
+            io.emit('newMessage', { chatID: chatID });
 
-        // get chat title
-        const chat = await Conversation.findOne({ _id: chatID });
-        const chatTitle = chat?.title;
+            // get chat title
+            const chat = await Conversation.findOne({ _id: chatID });
+            const chatTitle = chat?.title;
 
-        // send chatgpt response to client
-        io.emit('updatedChats');
-        res.status(200).send({ message: 'Res sent', GPTResponse: chatgptResponse, chatID: chatID, chatTitle: chatTitle });
+            // send chatgpt response to client
+            io.emit('updatedChats');
+            res.status(200).send({ message: 'Res sent', GPTResponse: chatgptResponse, chatID: chatID, chatTitle: chatTitle });
+        });
+
+        stream.on('error', (err: Error) => {
+            console.log(err);
+        });
 
     } catch (err) {
         console.log(err);
@@ -268,9 +301,9 @@ app.post('/api/admin/testStream', async (req: Request, res: Response) => {
             return;
         }
 
-        const completion = await openai.createCompletion({
-            model: 'text-davinci-003',
-            prompt: 'When was America founded?',
+        const completion = await openai.createChatCompletion({
+            model: 'gpt-3.5-turbo',
+            messages: [{ role: 'user', content: 'When was America founded?' }],
             stream: true,
         }, { responseType: 'stream' });
 
@@ -281,9 +314,12 @@ app.post('/api/admin/testStream', async (req: Request, res: Response) => {
             for (const payload of payloads) {
                 if (payload.includes('[DONE]')) return;
                 if (payload.startsWith("data:")) {
-                    const data = JSON.parse(payload.split("data: ")[1]);
+                    const data = JSON.parse(payload.replace("data: ", ""));
                     try {
-                        console.log(data.choices[0].text);
+                        const chunk: undefined | string = data.choices[0].delta?.content;
+                        if (chunk) {
+                            console.log(chunk);
+                        }
                     } catch (error) {
                         console.log(`Error with JSON.parse and ${payload}.\n${error}`);
                     }
