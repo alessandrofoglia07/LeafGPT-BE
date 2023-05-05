@@ -192,7 +192,7 @@ app.post('/api/chat/createMessage', authenticateJWT, async (req, res) => {
     try {
         // if chatID is empty, create a new conversation
         if (!chatID) {
-            const title = await createCompletion([{ role: 'user', content: `Create a conversation title for this question. It must have no more than 20 characters. The question: ${message.content}` }]);
+            const title = await createCompletion([{ role: 'user', content: `Create a conversation title for this question. Try to make it fit in 20 characters. The question: ${message.content}` }]);
             const newConversation = new Conversation({ userID: id, title: title });
             await newConversation.save();
             chatID = newConversation._id;
@@ -233,6 +233,7 @@ app.post('/api/chat/createMessage', authenticateJWT, async (req, res) => {
                     }
                     catch (err) {
                         console.log(`Error with JSON.parse and ${payload}.\n${err}`);
+                        io.emit('resError', { chatID: chatID, error: err });
                     }
                 }
             }
@@ -251,10 +252,12 @@ app.post('/api/chat/createMessage', authenticateJWT, async (req, res) => {
         });
         stream.on('error', (err) => {
             console.log(err);
+            io.emit('resError', { chatID: chatID, error: err });
         });
     }
     catch (err) {
         console.log(err);
+        io.emit('resError', { chatID: chatID, error: err });
     }
 });
 app.delete('/api/chat/deleteAllChatsByUserID', authenticateJWT, async (req, res) => {
