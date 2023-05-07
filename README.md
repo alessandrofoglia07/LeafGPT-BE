@@ -49,6 +49,8 @@ In the project directory, you can run:
 
 Starts the server in development mode. **Note that you need to have installed [nodemon](https://nodemon.io/).**
 
+<br/><br/><br/>
+
 ## About me 🧙‍♂️
 
 I'm Alex 🪐, a highschool student from Italy. I'm a self-taught developer and I'm currently studying web development, using React ⚛️, NodeJS and Typescript.
