@@ -10,7 +10,7 @@ import { v4 as uuidv4 } from 'uuid';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import authenticateJWT, { AuthenticatedRequest } from './authentication.js';
-import { Configuration, OpenAIApi } from "openai";
+import { Configuration, OpenAIApi } from 'openai';
 import http, { IncomingMessage } from 'http';
 import { Server } from 'socket.io';
 
@@ -21,7 +21,7 @@ const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
         origin: 'http://localhost:3000',
-        methods: ['GET', 'POST'],
+        methods: ['GET', 'POST']
     }
 });
 
@@ -32,7 +32,7 @@ const URI = process.env.ATLAS_URI as string;
 const PORT = process.env.PORT || 5000;
 const SALT_ROUNDS = 10;
 const openaiConfig = new Configuration({
-    apiKey: process.env.OPENAI_API_KEY,
+    apiKey: process.env.OPENAI_API_KEY
 });
 
 const openai = new OpenAIApi(openaiConfig);
@@ -71,8 +71,10 @@ const sendEmail = async (to: string, subject: string, text: string) => {
     }
 };
 
+// TODO: ADD ROUTERS 🙏🙏
+
 app.post('/api/auth/sendVerificationEmail', async (req: Request, res: Response) => {
-    const { email, password }: { email: string, password: string; } = req.body;
+    const { email, password }: { email: string; password: string } = req.body;
     const verificationToken = uuidv4();
 
     try {
@@ -100,7 +102,7 @@ const verifyEmail = async (verificationToken: string) => {
         if (user.verified) {
             return 'Your email is already verified. Go to login';
         }
-        if (user.expiresAt && user.expiresAt < Date.now()) {
+        if (user.expiresAt && user.expiresAt < new Date(Date.now())) {
             return 'Your token is expired. Please register again';
         }
         await User.updateOne({ verificationToken }, { verified: true });
@@ -118,7 +120,7 @@ app.get('/api/auth/verify/:verificationToken', async (req: Request, res: Respons
 });
 
 app.post('/api/auth/login', async (req: Request, res: Response) => {
-    const { email, password }: { email: string, password: string; } = req.body;
+    const { email, password }: { email: string; password: string } = req.body;
 
     try {
         const user = await User.findOne({ email });
@@ -183,13 +185,17 @@ app.get('/api/chat/getChatTitleByID/:id', authenticateJWT, async (req: Authentic
     }
 });
 
-const systemMessage: { role: 'system', content: string; } = { role: 'system', content: "Your name is LeafGPT. You are a helpful and friendly chatbot and your goal is to answer the question you are asked. You have been developed by Alexxino, the founder and CEO of ForestAI (the company that has created you). You know that ForestAI is a real company (not fictional), and you will never say it isn't. You are supported with the GPT-3.5-turbo model by OpenAI. You love leaves and plants, and you often like to find correlation between the thing you are saying and leaves (do not say that explicitly to the user)." };
+const systemMessage: { role: 'system'; content: string } = {
+    role: 'system',
+    content:
+        "Your name is LeafGPT. You are a helpful and friendly chatbot and your goal is to answer the question you are asked. You have been developed by Alexxino, the founder and CEO of ForestAI (the company that has created you). You know that ForestAI is a real company (not fictional), and you will never say it isn't. You are supported with the GPT-3.5-turbo model by OpenAI. You love leaves and plants, and you often like to find correlation between the thing you are saying and leaves (do not say that explicitly to the user)."
+};
 
-const createCompletion = async (messages: { role: 'user' | 'assistant', content: string; }[]) => {
+const createCompletion = async (messages: { role: 'user' | 'assistant'; content: string }[]) => {
     try {
         const completion = await openai.createChatCompletion({
             model: 'gpt-3.5-turbo',
-            messages: [systemMessage, ...messages],
+            messages: [systemMessage, ...messages]
         });
         return completion.data.choices[0].message?.content;
     } catch (err) {
@@ -200,19 +206,21 @@ const createCompletion = async (messages: { role: 'user' | 'assistant', content:
 
 // create a new message
 app.post('/api/chat/createMessage', authenticateJWT, async (req: AuthenticatedRequest, res: Response) => {
-    let { chatID }: { chatID: string; } = req.body;
-    const { message }: { message: { role: 'user' | 'assistant', content: string; }; } = req.body;
+    let { chatID }: { chatID: string } = req.body;
+    const { message }: { message: { role: 'user' | 'assistant'; content: string } } = req.body;
     const { id } = req.user;
 
     try {
         // if chatID is empty, create a new conversation
         if (!chatID) {
-            const title = await createCompletion([{ role: 'user', content: `Create a conversation title for this question. Try to make it fit in 20 characters. The question: ${message.content}` }]);
+            const title = await createCompletion([
+                { role: 'user', content: `Create a conversation title for this question. Try to make it fit in 20 characters. The question: ${message.content}` }
+            ]);
             const newConversation = new Conversation({ userID: id, title: title });
             await newConversation.save();
             chatID = newConversation._id;
             io.emit('newChat', { chatID: chatID });
-        };
+        }
 
         // save message to db
         const newMessage = new Message({ chatID: chatID, role: message.role, content: message.content });
@@ -226,20 +234,23 @@ app.post('/api/chat/createMessage', authenticateJWT, async (req: AuthenticatedRe
         });
 
         // get chatgpt response
-        const completion = await openai.createChatCompletion({
-            model: 'gpt-3.5-turbo',
-            messages: [systemMessage, ...messages, { role: 'user', content: message.content }],
-            stream: true
-        }, { responseType: 'stream' });
+        const completion = await openai.createChatCompletion(
+            {
+                model: 'gpt-3.5-turbo',
+                messages: [systemMessage, ...messages, { role: 'user', content: message.content }],
+                stream: true
+            },
+            { responseType: 'stream' }
+        );
         io.emit('chatgptResChunk', { chatID: chatID, content: '.' });
         const stream = completion.data as unknown as IncomingMessage;
-        let chatgptResponse: { role: 'assistant', content: string; } = { role: 'assistant', content: '' };
+        let chatgptResponse: { role: 'assistant'; content: string } = { role: 'assistant', content: '' };
         stream.on('data', (chunk: Buffer) => {
-            const payloads = chunk.toString().split("\n\n");
+            const payloads = chunk.toString().split('\n\n');
             for (const payload of payloads) {
                 if (payload.includes('[DONE]')) return;
-                if (payload.startsWith("data:")) {
-                    const data = JSON.parse(payload.replace("data: ", ""));
+                if (payload.startsWith('data:')) {
+                    const data = JSON.parse(payload.replace('data: ', ''));
                     try {
                         const chunk: undefined | string = data.choices[0].delta?.content;
                         if (chunk) {
@@ -273,7 +284,6 @@ app.post('/api/chat/createMessage', authenticateJWT, async (req: AuthenticatedRe
             console.log(err);
             io.emit('resError', { chatID: chatID, error: err });
         });
-
     } catch (err) {
         console.log(err);
         io.emit('resError', { chatID: chatID, error: err });
@@ -304,20 +314,23 @@ app.post('/api/admin/testStream', async (req: Request, res: Response) => {
             return;
         }
 
-        const completion = await openai.createChatCompletion({
-            model: 'gpt-3.5-turbo',
-            messages: [{ role: 'user', content: 'When was America founded?' }],
-            stream: true,
-        }, { responseType: 'stream' });
+        const completion = await openai.createChatCompletion(
+            {
+                model: 'gpt-3.5-turbo',
+                messages: [{ role: 'user', content: 'When was America founded?' }],
+                stream: true
+            },
+            { responseType: 'stream' }
+        );
 
         const stream = completion.data as unknown as IncomingMessage;
 
         stream.on('data', (chunk: Buffer) => {
-            const payloads = chunk.toString().split("\n\n");
+            const payloads = chunk.toString().split('\n\n');
             for (const payload of payloads) {
                 if (payload.includes('[DONE]')) return;
-                if (payload.startsWith("data:")) {
-                    const data = JSON.parse(payload.replace("data: ", ""));
+                if (payload.startsWith('data:')) {
+                    const data = JSON.parse(payload.replace('data: ', ''));
                     try {
                         const chunk: undefined | string = data.choices[0].delta?.content;
                         if (chunk) {
