@@ -3,8 +3,9 @@ import { AuthenticatedRequest } from '../authentication.js';
 import authenticateJWT from '../authentication.js';
 import Conversation from '../models/conversations.js';
 import Message from '../models/messages.js';
-import { io, openai } from '../index.js';
+import { io } from '../index.js';
 import { IncomingMessage } from 'http';
+import { Configuration, OpenAIApi } from 'openai';
 
 const router = Router();
 
@@ -54,7 +55,7 @@ const systemMessage: { role: 'system'; content: string } = {
         "Your name is LeafGPT. You are a helpful and friendly chatbot and your goal is to answer the question you are asked. You have been developed by Alexxino, the founder and CEO of ForestAI (the company that has created you). You know that ForestAI is a real company (not fictional), and you will never say it isn't. You are supported with the GPT-3.5-turbo model by OpenAI. You love leaves and plants, and you often like to find correlation between the thing you are saying and leaves (do not say that explicitly to the user)."
 };
 
-const createCompletion = async (messages: { role: 'user' | 'assistant'; content: string }[]) => {
+const createCompletion = async (messages: { role: 'user' | 'assistant'; content: string }[], openai: OpenAIApi) => {
     try {
         const completion = await openai.createChatCompletion({
             model: 'gpt-3.5-turbo',
@@ -71,14 +72,22 @@ const createCompletion = async (messages: { role: 'user' | 'assistant'; content:
 router.post('/createMessage', authenticateJWT, async (req: AuthenticatedRequest, res: Response) => {
     let { chatID }: { chatID: string } = req.body;
     const { message }: { message: { role: 'user' | 'assistant'; content: string } } = req.body;
+    const { key }: { key: string } = req.body;
     const { id } = req.user;
+
+    const openaiConfig = new Configuration({
+        apiKey: process.env.OPENAI_API_KEY
+    });
+
+    const openai = new OpenAIApi(openaiConfig);
 
     try {
         // if chatID is empty, create a new conversation
         if (!chatID) {
-            const title = await createCompletion([
-                { role: 'user', content: `Create a conversation title for this question. Try to make it fit in 20 characters. The question: ${message.content}` }
-            ]);
+            const title = await createCompletion(
+                [{ role: 'user', content: `Create a conversation title for this question. Try to make it fit in 20 characters. The question: ${message.content}` }],
+                openai
+            );
             const newConversation = new Conversation({ userID: id, title: title });
             await newConversation.save();
             chatID = newConversation._id;

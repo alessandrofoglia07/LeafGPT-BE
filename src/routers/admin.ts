@@ -1,19 +1,26 @@
 import { Router, Request, Response } from 'express';
-import { io, openai } from '../index.js';
+import { io } from '../index.js';
 import { IncomingMessage } from 'http';
 import Conversation from '../models/conversations.js';
 import Message from '../models/messages.js';
+import { Configuration, OpenAIApi } from 'openai';
 
 const router = Router();
 
 router.post('/testStream', async (req: Request, res: Response) => {
-    const { password } = req.body;
+    const { password, key } = req.body;
 
     try {
         if (password !== process.env.ADMIN_PASSWORD) {
             res.send({ message: 'Incorrect password' });
             return;
         }
+
+        const openaiConfig = new Configuration({
+            apiKey: process.env.OPENAI_API_KEY
+        });
+
+        const openai = new OpenAIApi(openaiConfig);
 
         const completion = await openai.createChatCompletion(
             {

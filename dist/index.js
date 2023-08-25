@@ -3,7 +3,6 @@ import cors from 'cors';
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import nodemailer from 'nodemailer';
-import { Configuration, OpenAIApi } from 'openai';
 import http from 'http';
 import { Server } from 'socket.io';
 import authRouter from './routers/auth.js';
@@ -25,10 +24,6 @@ app.use('/api/chat', chatRouter);
 app.use('/api/admin', adminRouter);
 const URI = process.env.ATLAS_URI;
 const PORT = process.env.PORT || 5000;
-const openaiConfig = new Configuration({
-    apiKey: process.env.OPENAI_API_KEY
-});
-export const openai = new OpenAIApi(openaiConfig);
 const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
